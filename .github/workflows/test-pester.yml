@@ -1,0 +1,30 @@
+name: Cross-Platform Pester Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Pester on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module Pester -Force -SkipPublisherCheck
+          Import-Module Pester
+
+      - name: Run Pester tests
+        shell: pwsh
+        run: |
+          Invoke-Pester -Path ./Tests -CI -Output Detailed
