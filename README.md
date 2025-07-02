@@ -1,2 +1,2 @@
-# copilot-playground
-Learn, Create, Automate with Copilot
+# IAM toolbox
+pwsh and python for LDAP and SCIM
