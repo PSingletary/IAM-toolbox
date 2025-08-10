@@ -49,119 +49,18 @@
     - Error messages don't expose sensitive information
 #>
 
-function New-IAMScriptTemplate {
-    [CmdletBinding()]
+# Helper function to generate Client Credentials template
+function Get-ClientCredentialsTemplate {
     param (
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [ValidatePattern('^[a-zA-Z0-9_-]+$', ErrorMessage = 'ScriptName can only contain alphanumeric characters, hyphens, and underscores.')]
+        [string]$Description,
         [string]$ScriptName,
-
-        [Parameter()]
-        [ValidateNotNullOrEmpty()]
-        [string]$Description = "A PowerShell script with OAuth2 authentication for API operations.",
-
-        [Parameter()]
-        [ValidateNotNullOrEmpty()]
-        [string]$Path = "$PSScriptRoot/../Templates",
-
-        [Parameter()]
-        [ValidateSet('ClientCredentials', 'AuthorizationCode', 'Password')]
-        [string]$OAuth2Flow = 'ClientCredentials',
-
-        [Parameter()]
-        [ValidateNotNullOrEmpty()]
-        [ValidatePattern('^https?://', ErrorMessage = 'ApiEndpoint must be a valid HTTP/HTTPS URL.')]
-        [string]$ApiEndpoint = 'https://api.example.com/v1/resource'
+        [string]$ApiEndpoint,
+        [string]$AUTHOR,
+        [string]$CREATION_DATE,
+        [string]$DEFAULT_VERSION
     )
-
-    # Constants
-    $DEFAULT_VERSION = '1.0.0'
-    $AUTHOR = 'Patrick'
-    $CREATION_DATE = Get-Date -Format 'yyyy-MM-dd'
-
-    try {
-        # Validate and create output directory
-        Write-Verbose "Validating output path: $Path"
-        if (-not (Test-Path -Path $Path -PathType Container)) {
-            try {
-                New-Item -ItemType Directory -Path $Path -Force | Out-Null
-                Write-Verbose "Created directory: $Path"
-            }
-            catch {
-                throw "Failed to create directory '$Path': $($_.Exception.Message)"
-            }
-        }
-
-        # Validate write permissions
-        if (-not (Test-Path -Path $Path -PathType Container)) {
-            throw "Path '$Path' is not a valid directory."
-        }
-
-        try {
-            $testFile = Join-Path -Path $Path -ChildPath "test_write.tmp"
-            New-Item -ItemType File -Path $testFile -Force | Out-Null
-            Remove-Item -Path $testFile -Force
-        }
-        catch {
-            throw "No write permission to directory '$Path': $($_.Exception.Message)"
-        }
-
-        # Generate output file path
-        $outputFile = Join-Path -Path $Path -ChildPath "$ScriptName.ps1"
-        
-        # Check if file already exists
-        if (Test-Path -Path $outputFile) {
-            $overwrite = Read-Host "File '$outputFile' already exists. Overwrite? (y/N)"
-            if ($overwrite -notmatch '^[Yy]$') {
-                Write-Host "Operation cancelled by user."
-                return
-            }
-        }
-
-        # Generate OAuth2 flow specific template
-        $template = switch ($OAuth2Flow) {
-            'ClientCredentials' { Get-ClientCredentialsTemplate }
-            'AuthorizationCode' { Get-AuthorizationCodeTemplate }
-            'Password' { Get-PasswordTemplate }
-        }
-
-        # Write template to file
-        Write-Verbose "Writing template to: $outputFile"
-        $template | Out-File -FilePath $outputFile -Encoding UTF8 -Force
-
-        # Validate generated script syntax
-        $syntaxErrors = @()
-        try {
-            $null = [System.Management.Automation.PSParser]::Tokenize($template, [ref]$syntaxErrors)
-        }
-        catch {
-            Write-Warning "Could not validate script syntax: $($_.Exception.Message)"
-        }
-
-        if ($syntaxErrors.Count -gt 0) {
-            Write-Warning "Script generated with syntax warnings:"
-            $syntaxErrors | ForEach-Object { Write-Warning "  $($_.Message)" }
-        }
-
-        # Success message with details
-        Write-Host "✅ Script template created successfully!" -ForegroundColor Green
-        Write-Host "📁 Location: $outputFile" -ForegroundColor Cyan
-        Write-Host "🔐 OAuth2 Flow: $OAuth2Flow" -ForegroundColor Cyan
-        Write-Host " API Endpoint: $ApiEndpoint" -ForegroundColor Cyan
-        Write-Host " Next Steps:" -ForegroundColor Yellow
-        Write-Host "   1. Review and customize the generated script" -ForegroundColor White
-        Write-Host "   2. Update the API endpoint and parameters" -ForegroundColor White
-        Write-Host "   3. Test with your OAuth2 credentials" -ForegroundColor White
-    }
-    catch {
-        Write-Error "Failed to create script template: $($_.Exception.Message)"
-        throw
-    }
-
-    # Helper function to generate Client Credentials template
-    function Get-ClientCredentialsTemplate {
-        $template = @"
+    
+    $template = @"
 <#
 .SYNOPSIS
     $Description
@@ -420,9 +319,18 @@ finally {
         return $template
     }
 
-    # Helper function to generate Authorization Code template
-    function Get-AuthorizationCodeTemplate {
-        $template = @"
+# Helper function to generate Authorization Code template
+function Get-AuthorizationCodeTemplate {
+    param (
+        [string]$Description,
+        [string]$ScriptName,
+        [string]$ApiEndpoint,
+        [string]$AUTHOR,
+        [string]$CREATION_DATE,
+        [string]$DEFAULT_VERSION
+    )
+    
+    $template = @"
 <#
 .SYNOPSIS
     $Description
@@ -501,9 +409,18 @@ Write-Log "Authorization Code flow template - implement based on your OAuth2 pro
         return $template
     }
 
-    # Helper function to generate Password template
-    function Get-PasswordTemplate {
-        $template = @"
+# Helper function to generate Password template
+function Get-PasswordTemplate {
+    param (
+        [string]$Description,
+        [string]$ScriptName,
+        [string]$ApiEndpoint,
+        [string]$AUTHOR,
+        [string]$CREATION_DATE,
+        [string]$DEFAULT_VERSION
+    )
+    
+    $template = @"
 <#
 .SYNOPSIS
     $Description
@@ -580,5 +497,115 @@ param (
 Write-Log "Password flow template - implement based on your OAuth2 provider" -Level 'INFO'
 "@
         return $template
+    }
+
+function New-IAMScriptTemplate {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^[a-zA-Z0-9_-]+$', ErrorMessage = 'ScriptName can only contain alphanumeric characters, hyphens, and underscores.')]
+        [string]$ScriptName,
+
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string]$Description = "A PowerShell script with OAuth2 authentication for API operations.",
+
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string]$Path = "$PSScriptRoot/../Templates",
+
+        [Parameter()]
+        [ValidateSet('ClientCredentials', 'AuthorizationCode', 'Password')]
+        [string]$OAuth2Flow = 'ClientCredentials',
+
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^https?://', ErrorMessage = 'ApiEndpoint must be a valid HTTP/HTTPS URL.')]
+        [string]$ApiEndpoint = 'https://api.example.com/v1/resource'
+    )
+
+    # Constants
+    $DEFAULT_VERSION = '1.0.0'
+    $AUTHOR = 'Patrick'
+    $CREATION_DATE = Get-Date -Format 'yyyy-MM-dd'
+
+    try {
+        # Validate and create output directory
+        Write-Verbose "Validating output path: $Path"
+        if (-not (Test-Path -Path $Path -PathType Container)) {
+            try {
+                New-Item -ItemType Directory -Path $Path -Force | Out-Null
+                Write-Verbose "Created directory: $Path"
+            }
+            catch {
+                throw "Failed to create directory '$Path': $($_.Exception.Message)"
+            }
+        }
+
+        # Validate write permissions
+        if (-not (Test-Path -Path $Path -PathType Container)) {
+            throw "Path '$Path' is not a valid directory."
+        }
+
+        try {
+            $testFile = Join-Path -Path $Path -ChildPath "test_write.tmp"
+            New-Item -ItemType File -Path $testFile -Force | Out-Null
+            Remove-Item -Path $testFile -Force
+        }
+        catch {
+            throw "No write permission to directory '$Path': $($_.Exception.Message)"
+        }
+
+        # Generate output file path
+        $outputFile = Join-Path -Path $Path -ChildPath "$ScriptName.ps1"
+        
+        # Check if file already exists
+        if (Test-Path -Path $outputFile) {
+            $overwrite = Read-Host "File '$outputFile' already exists. Overwrite? (y/N)"
+            if ($overwrite -notmatch '^[Yy]$') {
+                Write-Host "Operation cancelled by user."
+                return
+            }
+        }
+
+        # Generate OAuth2 flow specific template
+        $template = switch ($OAuth2Flow) {
+            'ClientCredentials' { Get-ClientCredentialsTemplate -Description $Description -ScriptName $ScriptName -ApiEndpoint $ApiEndpoint -AUTHOR $AUTHOR -CREATION_DATE $CREATION_DATE -DEFAULT_VERSION $DEFAULT_VERSION }
+            'AuthorizationCode' { Get-AuthorizationCodeTemplate -Description $Description -ScriptName $ScriptName -ApiEndpoint $ApiEndpoint -AUTHOR $AUTHOR -CREATION_DATE $CREATION_DATE -DEFAULT_VERSION $DEFAULT_VERSION }
+            'Password' { Get-PasswordTemplate -Description $Description -ScriptName $ScriptName -ApiEndpoint $ApiEndpoint -AUTHOR $AUTHOR -CREATION_DATE $CREATION_DATE -DEFAULT_VERSION $DEFAULT_VERSION }
+        }
+
+        # Write template to file
+        Write-Verbose "Writing template to: $outputFile"
+        $template | Out-File -FilePath $outputFile -Encoding UTF8 -Force
+
+        # Validate generated script syntax
+        $syntaxErrors = @()
+        try {
+            $null = [System.Management.Automation.PSParser]::Tokenize($template, [ref]$syntaxErrors)
+        }
+        catch {
+            Write-Warning "Could not validate script syntax: $($_.Exception.Message)"
+        }
+
+        if ($syntaxErrors.Count -gt 0) {
+            Write-Warning "Script generated with syntax warnings:"
+            $syntaxErrors | ForEach-Object { Write-Warning "  $($_.Message)" }
+        }
+
+        # Success message with details
+        Write-Host "✅ Script template created successfully!" -ForegroundColor Green
+        Write-Host "📁 Location: $outputFile" -ForegroundColor Cyan
+        Write-Host "🔐 OAuth2 Flow: $OAuth2Flow" -ForegroundColor Cyan
+        Write-Host " API Endpoint: $ApiEndpoint" -ForegroundColor Cyan
+        Write-Host " Next Steps:" -ForegroundColor Yellow
+        Write-Host "   1. Review and customize the generated script" -ForegroundColor White
+        Write-Host "   2. Update the API endpoint and parameters" -ForegroundColor White
+        Write-Host "   3. Test with your OAuth2 credentials" -ForegroundColor White
+    }
+    catch {
+        Write-Error "Failed to create script template: $($_.Exception.Message)"
+        throw
     }
 }
